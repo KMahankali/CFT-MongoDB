@@ -1,0 +1,284 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template installs a MongoDB cluster into an existing VPC.
+
+Parameters:
+  VPC:
+   Description: 'VCP to install the instances into'
+   Type: 'AWS::EC2::VPC::Id'
+
+  ApplicationName:
+   Description: An environment name that will be prefixed to resource names
+   Type: String
+
+  EnvironmentName:
+   Description: An environment name that will be prefixed to resource names
+   Type: String
+   AllowedValues:
+    - Dev1
+    - UAT
+    - Perf
+    - Prod
+  
+  InstanceAmiId:
+    Description: Specifies the AMI ID for your container instances
+    Type: String
+    Default: ami-xyz
+
+  SshKeyName:
+   Description: KeyPair name for accessing EC2 instances in cluster
+   Type: AWS::EC2::KeyPair::KeyName
+   Default: 'KeyName'
+
+  InstanceType:
+   Description: EC2 Instance Type
+   Type: String
+   AllowedValues:
+    - t2.large
+    - i2.2xlarge
+    - i2.4xlarge
+    - i2.8xlarge
+
+  VolumeType:
+   Description: 'The volume type. Acceptable values are gp2, io1, st1, sc1 and standard'
+   Type: 'String'
+   Default: 'io1'
+   AllowedValues:
+    - gp2
+    - io1
+    
+  Iops:
+   Type: String
+   Description: "Iops of EBS volume when io1 type is chosen. Otherwise ignored"
+   Default: 100
+
+  Subnets:
+   Description: 'Which subnets the EC2 instances should be deployed to.'
+   Type: List<AWS::EC2::Subnet::Id>
+   Default: "subnet-xyz,subnet-abc"
+
+  costcenter:
+   Type: String
+   Default: '123'
+
+Resources:
+
+ MongoDBSecurityGroup:
+  Type: AWS::EC2::SecurityGroup
+  Properties:
+   GroupDescription: 'MongoDB Traffic'
+   VpcId:
+    Ref: 'VPC'
+   SecurityGroupIngress:
+    -
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+      Description: Description
+    -
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+      Description: Description
+    -
+      IpProtocol: tcp
+      FromPort: 37040
+      ToPort: 37050
+      CidrIp: 0.0.0.0/0
+      Description: Description
+    -
+      IpProtocol: tcp
+      FromPort: 37040
+      ToPort: 37050
+      CidrIp: 0.0.0.0/0
+      Description: Description
+    -          
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 0.0.0.0/0
+      Description: Description
+
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mongodb-sg"
+    - Key: costcenter
+      Value: !Ref costcenter
+
+ NetworkInterface1: 
+  Type: AWS::EC2::NetworkInterface
+  Properties: 
+   SubnetId: subnet-abc
+   GroupSet: [{ "Ref" : "MongoDBSecurityGroup" }]
+   SourceDestCheck: 'true'
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mongodb-eni"
+    - Key: costcenter
+      Value: !Ref costcenter
+
+ MongoDNode1:
+  Type: AWS::EC2::Instance
+  Properties:
+   BlockDeviceMappings:
+        -
+          ## EBS Volume for storing mongodata
+          DeviceName: "/dev/sdh"
+          Ebs:
+            VolumeSize: 100
+            VolumeType: !Ref VolumeType
+            Iops: !Ref Iops
+            Encrypted: "true"
+   NetworkInterfaces:
+    - NetworkInterfaceId: !Ref NetworkInterface1
+      DeviceIndex: '0'
+   KeyName: !Ref SshKeyName
+   ImageId: !Ref InstanceAmiId
+   InstanceType: !Ref InstanceType
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdb1-ec2"
+    - Key: costcenter
+      Value: !Ref costcenter
+   UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash -xe
+          ################
+          # Add groups, make/mount filesystems
+          ################
+          sudo su
+          sudo groupadd mongod
+          useradd -g mongod mongod
+          sudo mkfs.xfs /dev/nvme1n1
+          sleep 10
+          echo /dev/nvme1n1  /mongodata xfs defaults,nofail 0 0 >> /etc/fstab
+          sleep 10
+          sudo mkdir /mongodata
+          sudo mount /dev/nvme1n1 /mongodata
+          chown -R mongod:mongod /mongodata
+          chmod -R 755 /mongodata
+          ###############
+          ###############
+          sudo /usr/bin/yum -y install cyrus-sasl cyrus-sasl-plain cyrus-sasl-gssapi krb5-libs lm_sensors-libs net-snmp-agent-libs net-snmp openssl rpm-libs tcp_wrappers-libs
+
+          sudo /usr/bin/yum -y install deltarpm
+
+          # User Limits
+          # MongoDb limits
+          echo "mongod              soft    nofile          64000" > /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nofile          64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+
+          #Kernel Parameters
+
+          echo "net.ipv4.tcp_keepalive_time = 120" > /etc/sysctl.d/99-mongod.conf
+          echo "vm.zone_reclaim_mode = 0" >> /etc/sysctl.d/99-mongod.conf
+          sysctl -p /etc/sysctl.d/99-mongod.conf
+
+          if cat /etc/rc.local | grep -q 'transparent_hugepage'; then
+                          echo "Seems like we already have the THP stuff in rc.local"
+          else
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+          fi
+
+
+          bash /etc/rc.local
+          #blockdev setting
+
+          echo 'ACTION!="add|change", GOTO="ra_end"' > /etc/udev/rules.d/99-readahead.rules
+          echo 'KERNEL=="dm-*", SUBSYSTEM=="block", ENV{DM_VG_NAME}=="appvg", ENV{DM_LV_NAME}=="data_lv", RUN+="/sbin/blockdev --setra 0 /dev/mapper/appvg-data_lv"' >> /etc/udev/rules.d/99-readahead.rules
+          echo 'LABEL="ra_end"' >> /etc/udev/rules.d/99-readahead.rules
+          udevadm trigger
+
+          ################
+          #MongoD Installation
+          ################
+          cat > /etc/yum.repos.d/mongodb-enterprise.repo << EOF1
+          [mongodb-enterprise]
+          name=MongoDB Enterprise Repository
+          baseurl=https://repo.mongodb.com/yum/redhat/\$releasever/mongodb-enterprise/3.6/\$basearch/
+          check=1
+          enabled=1
+          gpgkey=https://www.mongodb.org/static/pgp/server-3.6.asc
+          EOF1
+          sudo yum install -y mongodb-enterprise
+          sleep 60
+          semanage port -a -t mongod_port_t -p tcp 27017 
+          sudo service mongod start
+          sudo service mongod restart
+          echo "exclude=mongodb-enterprise,mongodb-enterprise-server,mongodb-enterprise-shell,mongodb-enterprise-mongos,mongodb-enterprise-tools" >> /etc/yum.conf
+          sed -i -e 's/27017/37043/g' /etc/mongod.conf
+          ##############
+          # Download, Install, Configure, and Enable MongoDB Automation Agent
+          ##############
+          OPS_MGR_URI=OPS MANAGER URI GOES HERE
+          AGENT_RPM=mongodb-mms-automation-agent-manager-latest.x86_64.rhel7.rpm
+          cd /root && curl -OL $OPS_MGR_URI/download/agent/automation/$AGENT_RPM
+          rpm -U $AGENT_RPM
+          AUTOMATION_AGENT_CONFIG_FILE=/etc/mongodb-mms/automation-agent.config
+          sed -i "s/serverPoolKey=*./serverPoolKey=POOL KEY INFO GOES HERE/g" $AUTOMATION_AGENT_CONFIG_FILE
+          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=OPS MANAGER URI GOES HERE!g' $AUTOMATION_AGENT_CONFIG_FILE
+          systemctl enable mongodb-mms-automation-agent.service
+          ##############
+          # Configure server pool properties
+          ##############
+          # Get t-shirt size
+          #NUM_CPUS=$(grep processor /proc/cpuinfo | tail -n 1 | awk -F ":" '{print $2}')
+          METADATA_SERVER_IP=169.254.169.254
+          INSTANCE_TYPE_ENDPOINT='/latest/meta-data/instance-type/'
+          TSHIRTSIZE=$(curl http://169.254.169.254$INSTANCE_TYPE_ENDPOINT)
+          # Get the chipset size
+          CHIPSET=INTEL
+          # Get the location
+          REGION_ENDPOINT='/latest/meta-data/placement/availability-zone/'
+          LOCATION=$(curl http://$METADATA_SERVER_IP$REGION_ENDPOINT)
+          # Get the instance type
+          ENV=DEV
+          # Update server pool file
+          SERVER_POOL_PROPS_FILE=/etc/mongodb-mms/server-pool.properties
+          echo "CHIPSET=$CHIPSET" >> $SERVER_POOL_PROPS_FILE
+          echo "ENV=$ENV" >> $SERVER_POOL_PROPS_FILE
+          echo "LOCATION=$LOCATION" >> $SERVER_POOL_PROPS_FILE
+          echo "TSHIRTSIZE=$TSHIRTSIZE" >> $SERVER_POOL_PROPS_FILE
+          systemctl restart mongodb-mms-automation-agent.service
+          systemctl enable mongodb-mms-automation-agent.service
+
+ mdbnode1InstanceRecoveryAlarm:
+  Type: AWS::CloudWatch::Alarm
+  Properties:
+   AlarmDescription: EC2 Autorecovery for Node Instance. Autorecover if we fail
+   Namespace: AWS/EC2
+   MetricName: StatusCheckFailed_System
+   Statistic: Minimum
+   Period: '60'
+   EvaluationPeriods: '5'
+   ComparisonOperator: GreaterThanThreshold
+   Threshold: '0'
+   AlarmActions:
+   - Fn::Join:
+     - ''
+     - - 'arn:aws:automate:'
+       - Ref: AWS::Region
+       - ":ec2:recover"
+   Dimensions:
+   - Name: InstanceId
+     Value: !Ref MongoDNode1
