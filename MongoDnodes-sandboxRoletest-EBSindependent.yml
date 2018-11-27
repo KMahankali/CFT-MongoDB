@@ -1,0 +1,902 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template installs a MongoDB cluster into an existing VPC.
+
+Parameters:
+  VPC:
+   Description: 'VCP to install the instances into'
+   Type: 'AWS::EC2::VPC::Id'
+
+  ApplicationName:
+   Description: An environment name that will be prefixed to resource names
+   Type: String
+
+  EnvironmentName:
+   Description: An environment name that will be prefixed to resource names
+   Type: String
+   #Default: Dev
+   AllowedValues:
+    - Dev
+    - UAT
+    - Perf
+    - Prod
+  
+  InstanceAmiId:
+    Description: Specifies the AMI ID for your container instances
+    Type: String
+    #Default: ami-0221d14f37b6a6c30
+    #Default: ami-003ff4bc201a81e3d
+    Default: ami-0f8e5223638afe974
+
+  SshKeyName:
+   Description: KeyPair name for accessing EC2 instances in cluster
+   Type: AWS::EC2::KeyPair::KeyName
+   #Default: 'mongodb'
+   Default: 'MongoPOC'
+
+  InstanceType:
+   Description: EC2 Instance Type
+   Type: String
+   #Default: m5.xlarge
+   AllowedValues:
+     - m5.xlarge
+     - t2.medium
+     - i2.2xlarge
+     - i2.4xlarge
+     - i2.8xlarge
+
+  VolumeType:
+   Description: 'The volume type. Acceptable values are gp2, io1, st1, sc1 and standard'
+   Type: 'String'
+   Default: 'io1'
+   AllowedValues:
+    - gp2
+    - io1
+    
+  Iops:
+   Type: String
+   Description: "Iops of EBS volume when io1 type is chosen. Otherwise ignored"
+   Default: 100
+
+  PrivateSubnetAZ1:
+   Description: 'Which subnets the EC2 instances should be deployed to.'
+   #Type: List<AWS::EC2::Subnet::Id>
+   Type: String
+   #Default: "subnet-000647f47e1a6be01,subnet-07b314eee51b367d7"
+   Default: subnet-0fdf583c85b4c502e
+
+  PrivateSubnetAZ2:
+   Description: 'Which subnets the EC2 instances should be deployed to.'
+   Type: String
+   #Type: List<AWS::EC2::Subnet::Id>
+   #Default: "subnet-000647f47e1a6be01,subnet-07b314eee51b367d7"
+   Default: subnet-08bac8e0d3ea3d9c8
+
+  costcenter:
+   Type: String
+   Default: '6590190300'
+
+  resourcetype:
+   Type: String
+   Default: mongodb
+
+Resources:
+
+ MongoDBSecurityGroup:
+  Type: AWS::EC2::SecurityGroup
+  Properties:
+   GroupDescription: 'MongoDB Traffic'
+   VpcId:
+    Ref: 'VPC'
+   SecurityGroupIngress:
+    -
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+    -
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+    -
+      IpProtocol: tcp
+      FromPort: 37040
+      ToPort: 37050
+      CidrIp: 22.174.106.0/24
+      Description: Traffic to MonMongoDB on Anthem MongoDB port
+    -
+      IpProtocol: tcp
+      FromPort: 37040
+      ToPort: 37050
+      CidrIp: 30.0.0.0/16
+      Description: Traffic ANthem Network
+    -          
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 22.174.106.128/25
+      Description: Basic SSH on SandBox Subnet
+    -
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 30.120.0.0/16
+      Description: Inbound Anthem Richmond Premise
+    -
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 30.138.0.0/16
+      Description: Inbound Anthem Network
+
+    -
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 0.0.0.0/0
+      Description: All to test
+
+    -
+      IpProtocol: tcp
+      FromPort: 27020
+      ToPort: 27030
+      CidrIp: 22.174.106.0/24
+      Description: Access Rule for Mongo Hosts in 2/25 Subnets
+    -
+      IpProtocol: tcp
+      FromPort: 27020
+      ToPort: 27030
+      CidrIp: 30.128.117.0/24
+      Description: Ops Manager Onprem
+
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mongodb-sg"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ NetworkInterface1: 
+  Type: AWS::EC2::NetworkInterface
+  Properties: 
+   SubnetId: subnet-0fdf583c85b4c502e
+   GroupSet: [{ "Ref" : "MongoDBSecurityGroup" }]
+   SourceDestCheck: 'true'
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mongodb-eni"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+ 
+ NetworkInterface2: 
+  Type: AWS::EC2::NetworkInterface
+  Properties: 
+   SubnetId: subnet-0fdf583c85b4c502e
+   GroupSet: [{ "Ref" : "MongoDBSecurityGroup" }]
+   SourceDestCheck: 'true'
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mongodb-eni"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ NetworkInterface3: 
+  Type: AWS::EC2::NetworkInterface
+  Properties: 
+   SubnetId: subnet-08bac8e0d3ea3d9c8
+   GroupSet: [{ "Ref" : "MongoDBSecurityGroup" }]
+   SourceDestCheck: 'true'
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mongodb-eni"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ Mongolog1:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1a
+   VolumeType: !Ref VolumeType
+   Size: 50
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdblog1-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ Mongodata1:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1a
+   VolumeType: !Ref VolumeType
+   Size: 50
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdbdata1-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ Mongobackup1:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1a
+   VolumeType: !Ref VolumeType
+   Size: 100
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdbbackup1-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ MongoDNode1:
+  Type: AWS::EC2::Instance
+  Properties:
+   NetworkInterfaces:
+    - NetworkInterfaceId: !Ref NetworkInterface1
+      DeviceIndex: '0'
+   KeyName: !Ref SshKeyName
+   #SubnetId: !Ref PrivateSubnetAZ1
+   ImageId: !Ref InstanceAmiId
+   InstanceType: !Ref InstanceType
+   Volumes:
+    - Device: "/dev/sdc"
+      VolumeId: !Ref Mongolog1
+    - Device: "/dev/sdf"
+      VolumeId: !Ref Mongodata1
+    - Device: "/dev/sdh"
+      VolumeId: !Ref Mongobackup1    
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdb1-ec2"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key: resourcetype
+      Value: !Ref resourcetype
+   UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash -xe
+          ################
+          # Add groups, make/mount filesystems
+          ################
+          sudo su
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAmMQNHGQbhWYIalFWtFxemWoO0fwM/FGNl6LCD7rTuYxW+kGIOZgYmBcQWT90h9p+MW0p1NDF1IYyDaKObboAiEAYclZSuIHoXf5HOC0HSgP9bGsdjyd/Ic2yP5IYGi4gJ52HVRUmFab8B/fDEJpyEZGP0l0emiLm0/S/TJKKNhtNjLB8MBVTTyL6wfR+fPjRMobIje7fyR4W575lAFcCNfEQgBlwl8tUNl/oZnnDiH7piKMWtZdlp1DvK+MmQOM6QCr3z4hgWBw1eMvs8E0w4Td2X4ee6OC3oPAQzxEcwmXs/Yy2qKaqPchIv9unRMnNsrO2pDMgAqJvZ6IgIs9s0w== rsa-key-20180524 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA07INw9hSCo+W8lnZXWGRk+mwpIhbE3SK+ADN070xudvdNIgNrUJqCLTElY5yYV4XUUCGvuqEQFrEVrdhpA1cruaYwxtjkZnQ8oHm6MWNbMMuGs0YtP5oocHyqx+p7V7LB7UwA5TWZvMHBSAd23+LM4/ZLKB8fetIfLgknMcCdBwYI+OtiBuKEoVA7NIIyJ6g20X3HvE7+KTcC3GiwluP4+O3Uf1wxY0W8lf0NeZVxB3tbINBKUT/XxZppZn+TKVTKSRYaAcFI44tEubdY59bsgYZYdqOEN9+RpIBgqXi2dOUSmuzvNGaJ5ndw9xLOoJehNeViVHy8X/5f/CTdp43mQ== rsa-key-20180712 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAwq4erJ8VJj751tKBoGapB9e1LRfdLmQUbiyszB+tubvKXZ9Wfqm3RH+TOs42Er9RzruSZHLd+yr/H+ykYyuL922CScgIxXYJs8hdqMunWJePHFdE5N3Xxe56LGm4NW+ToreKaxUba20NDcSNG0Wtu1vLIuhTYir3TCToXs0kknZkkSGd57qrbU4SQpHaoPfZ2dZ6cCOZNNj3YP6isNd5D5pNpXGvHcnyI3L2IcJURufptwDtVb4WGmU6KzkwMGSeTKGiRQZPahY89aMTM+IvYlWSpXMv8YaG+HQvRdYUmxF5O7Fm+nUP0oKiTQlkyQ+XJ78IpfmMCl0Vq8kxOSxvcw== rsa-key-20180611 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAxcwEnG+w4P8GSTwkUBFQ8swx5VfZwQqkJ7UGdFmq6alr0ah0blqlxk00lSTsgShX4ljmLHgYMFuC7lMNjx87ESo4wkrDmE2uah5MOD/G075hJJZoDaQisEj4pH5k+vqZ9gxseTBgJ+V1G4KtSySfAJIIFWKgq8/4KEvBL0jkv9keUjr+uKv6Ez4zILbT3YGKqpZkw+U6qUFuEqmVrpgz6J/N4n5hLj4NQbE+PyHyFZFrjqx8UCLDQdjW+P2jLyLzUMqCfhBHDl4zIKaD9K3ZmZYKsPAQmA3WD4B/Sqcs+NIWc2pEfj9x0lRrchs9L7+/hV7GMiVDeleZLcuv9D8/sQ== rsa-key-20180928 >> //home/ec2-user/.ssh/authorized_keys
+          echo 'mongod          ALL=(root)      NOPASSWD: /bin/rpm -U mongodb-mms-automation-agent-*.rpm, /bin/rpm -ivh mongodb-mms-2.0.0.327-1.x86_64.rpm, /bin/rvi /etc/init.d/mongod,/bin/rvi /etc/logrotate.d/mongodb, /bin/rvi /etc/mongod.conf,/bin/rvi /etc/mongodb-mms/automation-agent.config,/bin/rvi /etc/yum.conf,/bin/rvi /etc/yum.repos.d/mongodb-*.repo,/bin/rvi /etc/yum.repos.d/mongodb-enterprise-*.repo,/bin/rvi /etc/yum.repos.d/mongodb-enterprise-3.2.repo,/bin/rvi /opt/mongodb/mms/conf/conf-mms.properties, /bin/sh mdiag.sh, /bin/su - mongod, /sbin/blockdev --report, /sbin/chkconfig mongod on,/sbin/service mongod restart, /sbin/service mongod start, /sbin/service mongod status, /sbin/service mongod stop, /sbin/service mongodb-mms restart, /sbin/service mongodb-mms start, /sbin/service mongodb-mms status, /sbin/service mongodb-mms stop, /sbin/service mongodb-mms-automation-agent check, /sbin/service mongodb-mms-automation-agent restart, /sbin/service mongodb-mms-automation-agent start, /sbin/service mongodb-mms-automation-agent status, /sbin/service mongodb-mms-automation-agent stop, /usr/bin/yum clean all, /usr/bin/yum  install -y mongo*, /usr/bin/yum install -y mongodb-enterprise, /usr/bin/yum install -y mongodb-enterprise-2.6.9  mongodb-enterprise-server-2.6.9, /usr/bin/yum install python33-python-pymongo mongodb-enterprise-shell-2.6.9 mongodb-enterprise-mongos-2.6.9 mongodb-enterprise-tools-2.6.9, /sbin/service mongodb-mms-monitoring-agent stop, /sbin/service mongodb-mms-monitoring-agent start, /sbin/service mongodb-mms-backup-agent start, /sbin/service mongodb-mms-backup-agent stop, /sbin/service mongodb-mms-backup-daemon start, /sbin/service mongodb-mms-backup-daemon stop, /usr/bin/pip install pymango*, /bin/rview /var/log/messages, /bin/rvi /etc/mongod-blockstore.conf, /usr/bin/yum list installed, /usr/bin/yum remove mongodb-enterprise*, /bin/rvi /etc/openldap/trusted-local-CA-chain.pem, /bin/rvi /etc/openldap/ldap.conf, /usr/bin/easy_install pip, /usr/bin/pip install *, /bin/rm /etc/yum.repos.d/mongodb-enterprise/[!'..']*, /usr/bin/yum install cyrus-sasl cyrus-sasl-plain cyrus-sasl-gssapi krb5-libs lm_sensors-libs net-snmp-agent-libs net-snmp openssl rpm-libs tcp_wrappers-libs, /sbin/service mongod-appdb restart, /sbin/service mongod-appdb start, /sbin/service mongod-appdb status, /sbin/service  mongod-appdb stop, /sbin/service mongod-blockstore restart, /sbin/service mongod-blockstore start, /sbin/service mongod-blockstore status, /sbin/service mongod-blockstore stop, /bin/rm /etc/yum.repos.d/mongodb-*.repo, /bin/cp /tmp/[!'..']* /opt/mongodb/mms/mongodb-releases, /bin/chown -R mongodb-mms\:mongodb-mms /opt/mongodb/mms/mongodb-releases, /opt/mongodb-mms-automation/bin/mongodb-mms-automation-make-init-scripts -boot, /bin/rvi /etc/security/limits.d/99-mongodb-mms-automation-agent.conf, /bin/yum check, /bin/rvi /etc/systemd/system/mongodb-mms-automation-agent.service,/bin/systemctl daemon-reload, /usr/bin/yum erase mongodb-*, !/usr/bin/yum erase mongodb-* *, /bin/rvi /etc/mongod-appdb.conf, /usr/bin/easy_install pymongo, /bin/rvi /etc/logrotate.d/mongod-blockstore, /sbin/logrotate --force /etc/logrotate.d/mongod-blockstore, /sbin/logrotate --force, /etc/logrotate.d/mongod, /bin/rm /opt/mongodb/mms/logs/daemon.20*.gz, /bin/rm /opt/mongodb/mms/logs/mms0.20*.gz, /bin/rm  /opt/mongodb/mms/logs/mms0-access.20*.gz, /bin/su - mongodb-mms, /bin/rpm -U mongodb-mms-*.rpm, /bin/rpm -e mongodb*, !/bin/rpm -e * *, /bin/cp /tmp/cacerts /opt/mongodb/mms/jdk/jre/lib/security/cacerts, /bin/rvi /opt/mongodb/mms/conf/mms.conf, /bin/rvi /etc/init.d/mongodb-mms-automation-agent, /sbin/blockdev --report *, !/sbin/blockdev --report * *, /bin/rvi /etc/mongodb-mms/server-pool.properties, /usr/bin/yum repolist all' >> /etc/sudoers
+          echo 'mongod         ALL=(root)      !/usr/local/bin/sudo, !/usr/bin/sudo, !/bin/sudo' >> /etc/sudoers
+          sudo groupadd mongod
+          useradd -g mongod mongod
+          sudo mkfs.xfs /dev/nvme4n1
+          sleep 10
+          echo /dev/nvme4n1  /var/mongolog xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkfs.xfs /dev/nvme1n1
+          sleep 10
+          echo /dev/nvme1n1  /mongodata xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkfs.xfs /dev/nvme3n1
+          sleep 10
+          echo /dev/nvme3n1  /backup xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkdir /var/mongolog
+          sudo mount /dev/nvme4n1 /var/mongolog
+          chown -R mongod:mongod /var/mongolog
+          chmod -R 755 /var/mongolog
+          sudo mkdir /mongodata
+          sudo mount /dev/nvme1n1 /mongodata
+          chown -R mongod:mongod /mongodata
+          chmod -R 755 /mongodata
+          sudo mkdir /backup
+          sudo mount /dev/nvme3n1 /backup
+          chown -R mongod:mongod /backup
+          chmod -R 755 /backup
+          ###############
+          ###############
+          sudo /usr/bin/yum -y install cyrus-sasl cyrus-sasl-plain cyrus-sasl-gssapi krb5-libs lm_sensors-libs net-snmp-agent-libs net-snmp openssl rpm-libs tcp_wrappers-libs
+
+          sudo /usr/bin/yum -y install deltarpm
+
+          # User Limits
+          # MongoDb limits
+          echo "mongod              soft    nofile          64000" > /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nofile          64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+
+          #Kernel Parameters
+
+          echo "net.ipv4.tcp_keepalive_time = 120" > /etc/sysctl.d/99-mongod.conf
+          echo "vm.zone_reclaim_mode = 0" >> /etc/sysctl.d/99-mongod.conf
+          sysctl -p /etc/sysctl.d/99-mongod.conf
+
+          if cat /etc/rc.local | grep -q 'transparent_hugepage'; then
+                          echo "Seems like we already have the THP stuff in rc.local"
+          else
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+          fi
+
+
+          bash /etc/rc.local
+          #blockdev setting
+
+          echo 'ACTION!="add|change", GOTO="ra_end"' > /etc/udev/rules.d/99-readahead.rules
+          echo 'KERNEL=="dm-*", SUBSYSTEM=="block", ENV{DM_VG_NAME}=="appvg", ENV{DM_LV_NAME}=="data_lv", RUN+="/sbin/blockdev --setra 0 /dev/mapper/appvg-data_lv"' >> /etc/udev/rules.d/99-readahead.rules
+          echo 'LABEL="ra_end"' >> /etc/udev/rules.d/99-readahead.rules
+          udevadm trigger
+
+          ################
+          #MongoD Installation
+          ################
+          cat > /etc/yum.repos.d/mongodb-enterprise.repo << EOF1
+          [mongodb-enterprise]
+          name=MongoDB Enterprise Repository
+          baseurl=https://repo.mongodb.com/yum/redhat/\$releasever/mongodb-enterprise/3.6/\$basearch/
+          check=1
+          enabled=1
+          gpgkey=https://www.mongodb.org/static/pgp/server-3.6.asc
+          EOF1
+          sudo yum install -y mongodb-enterprise
+          sleep 60
+          semanage port -a -t mongod_port_t -p tcp 27017 
+          sudo service mongod start
+          sudo service mongod restart
+          echo "exclude=mongodb-enterprise,mongodb-enterprise-server,mongodb-enterprise-shell,mongodb-enterprise-mongos,mongodb-enterprise-tools" >> /etc/yum.conf
+          sed -i -e 's/27017/37043/g' /etc/mongod.conf
+          ##############
+          # Download, Install, Configure, and Enable MongoDB Automation Agent
+          ##############
+          OPS_MGR_URI=http://va10plvpos300.wellpoint.com:27030
+          #AGENT_RPM=mongodb-mms-automation-agent-manager-4.5.13.5261-1.x86_64.rhel7.rpm
+          AGENT_RPM=mongodb-mms-automation-agent-manager-latest.x86_64.rhel7.rpm
+          cd /root && curl -OL $OPS_MGR_URI/download/agent/automation/$AGENT_RPM
+          rpm -U $AGENT_RPM
+          AUTOMATION_AGENT_CONFIG_FILE=/etc/mongodb-mms/automation-agent.config
+          sed -i "s/serverPoolKey=*./serverPoolKey=0f330d158d39a0ac0582d86bc30ec94d/g" $AUTOMATION_AGENT_CONFIG_FILE
+          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://va10plvpos300.wellpoint.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
+          #sed -i 's!logFile=*!logFile=/var/log/mongodb-mms-automation/automation-agent.log!g' $AUTOMATION_AGENT_CONFIG_FILE
+          systemctl enable mongodb-mms-automation-agent.service
+          ##############
+          # Configure server pool properties
+          ##############
+          # Get t-shirt size
+          #NUM_CPUS=$(grep processor /proc/cpuinfo | tail -n 1 | awk -F ":" '{print $2}')
+          METADATA_SERVER_IP=169.254.169.254
+          INSTANCE_TYPE_ENDPOINT='/latest/meta-data/instance-type/'
+          TSHIRTSIZE=$(curl http://169.254.169.254$INSTANCE_TYPE_ENDPOINT)
+          # Get the chipset size
+          CHIPSET=INTEL
+          # Get the location
+          REGION_ENDPOINT='/latest/meta-data/placement/availability-zone/'
+          LOCATION=$(curl http://$METADATA_SERVER_IP$REGION_ENDPOINT)
+          # Get the instance type
+          ENV=DEV
+          # Update server pool file
+          SERVER_POOL_PROPS_FILE=/etc/mongodb-mms/server-pool.properties
+          echo "CHIPSET=$CHIPSET" >> $SERVER_POOL_PROPS_FILE
+          echo "ENV=$ENV" >> $SERVER_POOL_PROPS_FILE
+          echo "LOCATION=$LOCATION" >> $SERVER_POOL_PROPS_FILE
+          echo "TSHIRTSIZE=$TSHIRTSIZE" >> $SERVER_POOL_PROPS_FILE
+          systemctl restart mongodb-mms-automation-agent.service
+          systemctl enable mongodb-mms-automation-agent.service
+
+ Mongolog2:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1a
+   VolumeType: !Ref VolumeType
+   Size: 50
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdblog2-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ Mongodata2:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1a
+   VolumeType: !Ref VolumeType
+   Size: 50
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdbdata2-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ Mongobackup2:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1a
+   VolumeType: !Ref VolumeType
+   Size: 100
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdbbackup2-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ MongoDNode2:
+  Type: AWS::EC2::Instance
+  Properties:
+   NetworkInterfaces:
+    - NetworkInterfaceId: !Ref NetworkInterface2
+      DeviceIndex: '0'
+   KeyName: !Ref SshKeyName
+   #SubnetId: !Ref PrivateSubnetAZ1
+   ImageId: !Ref InstanceAmiId
+   InstanceType: !Ref InstanceType
+   Volumes:
+    - Device: "/dev/sdg"
+      VolumeId: !Ref Mongolog2
+    - Device: "/dev/sdf"
+      VolumeId: !Ref Mongodata2
+    - Device: "/dev/sdh"
+      VolumeId: !Ref Mongobackup2    
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdb2-ec2"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key: resourcetype
+      Value: !Ref resourcetype
+   UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash -xe
+          ################
+          # Add groups, make/mount filesystems
+          ################
+          sudo su
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAmMQNHGQbhWYIalFWtFxemWoO0fwM/FGNl6LCD7rTuYxW+kGIOZgYmBcQWT90h9p+MW0p1NDF1IYyDaKObboAiEAYclZSuIHoXf5HOC0HSgP9bGsdjyd/Ic2yP5IYGi4gJ52HVRUmFab8B/fDEJpyEZGP0l0emiLm0/S/TJKKNhtNjLB8MBVTTyL6wfR+fPjRMobIje7fyR4W575lAFcCNfEQgBlwl8tUNl/oZnnDiH7piKMWtZdlp1DvK+MmQOM6QCr3z4hgWBw1eMvs8E0w4Td2X4ee6OC3oPAQzxEcwmXs/Yy2qKaqPchIv9unRMnNsrO2pDMgAqJvZ6IgIs9s0w== rsa-key-20180524 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA07INw9hSCo+W8lnZXWGRk+mwpIhbE3SK+ADN070xudvdNIgNrUJqCLTElY5yYV4XUUCGvuqEQFrEVrdhpA1cruaYwxtjkZnQ8oHm6MWNbMMuGs0YtP5oocHyqx+p7V7LB7UwA5TWZvMHBSAd23+LM4/ZLKB8fetIfLgknMcCdBwYI+OtiBuKEoVA7NIIyJ6g20X3HvE7+KTcC3GiwluP4+O3Uf1wxY0W8lf0NeZVxB3tbINBKUT/XxZppZn+TKVTKSRYaAcFI44tEubdY59bsgYZYdqOEN9+RpIBgqXi2dOUSmuzvNGaJ5ndw9xLOoJehNeViVHy8X/5f/CTdp43mQ== rsa-key-20180712 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAwq4erJ8VJj751tKBoGapB9e1LRfdLmQUbiyszB+tubvKXZ9Wfqm3RH+TOs42Er9RzruSZHLd+yr/H+ykYyuL922CScgIxXYJs8hdqMunWJePHFdE5N3Xxe56LGm4NW+ToreKaxUba20NDcSNG0Wtu1vLIuhTYir3TCToXs0kknZkkSGd57qrbU4SQpHaoPfZ2dZ6cCOZNNj3YP6isNd5D5pNpXGvHcnyI3L2IcJURufptwDtVb4WGmU6KzkwMGSeTKGiRQZPahY89aMTM+IvYlWSpXMv8YaG+HQvRdYUmxF5O7Fm+nUP0oKiTQlkyQ+XJ78IpfmMCl0Vq8kxOSxvcw== rsa-key-20180611 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAxcwEnG+w4P8GSTwkUBFQ8swx5VfZwQqkJ7UGdFmq6alr0ah0blqlxk00lSTsgShX4ljmLHgYMFuC7lMNjx87ESo4wkrDmE2uah5MOD/G075hJJZoDaQisEj4pH5k+vqZ9gxseTBgJ+V1G4KtSySfAJIIFWKgq8/4KEvBL0jkv9keUjr+uKv6Ez4zILbT3YGKqpZkw+U6qUFuEqmVrpgz6J/N4n5hLj4NQbE+PyHyFZFrjqx8UCLDQdjW+P2jLyLzUMqCfhBHDl4zIKaD9K3ZmZYKsPAQmA3WD4B/Sqcs+NIWc2pEfj9x0lRrchs9L7+/hV7GMiVDeleZLcuv9D8/sQ== rsa-key-20180928 >> //home/ec2-user/.ssh/authorized_keys
+          echo 'mongod          ALL=(root)      NOPASSWD: /bin/rpm -U mongodb-mms-automation-agent-*.rpm, /bin/rpm -ivh mongodb-mms-2.0.0.327-1.x86_64.rpm, /bin/rvi /etc/init.d/mongod,/bin/rvi /etc/logrotate.d/mongodb, /bin/rvi /etc/mongod.conf,/bin/rvi /etc/mongodb-mms/automation-agent.config,/bin/rvi /etc/yum.conf,/bin/rvi /etc/yum.repos.d/mongodb-*.repo,/bin/rvi /etc/yum.repos.d/mongodb-enterprise-*.repo,/bin/rvi /etc/yum.repos.d/mongodb-enterprise-3.2.repo,/bin/rvi /opt/mongodb/mms/conf/conf-mms.properties, /bin/sh mdiag.sh, /bin/su - mongod, /sbin/blockdev --report, /sbin/chkconfig mongod on,/sbin/service mongod restart, /sbin/service mongod start, /sbin/service mongod status, /sbin/service mongod stop, /sbin/service mongodb-mms restart, /sbin/service mongodb-mms start, /sbin/service mongodb-mms status, /sbin/service mongodb-mms stop, /sbin/service mongodb-mms-automation-agent check, /sbin/service mongodb-mms-automation-agent restart, /sbin/service mongodb-mms-automation-agent start, /sbin/service mongodb-mms-automation-agent status, /sbin/service mongodb-mms-automation-agent stop, /usr/bin/yum clean all, /usr/bin/yum  install -y mongo*, /usr/bin/yum install -y mongodb-enterprise, /usr/bin/yum install -y mongodb-enterprise-2.6.9  mongodb-enterprise-server-2.6.9, /usr/bin/yum install python33-python-pymongo mongodb-enterprise-shell-2.6.9 mongodb-enterprise-mongos-2.6.9 mongodb-enterprise-tools-2.6.9, /sbin/service mongodb-mms-monitoring-agent stop, /sbin/service mongodb-mms-monitoring-agent start, /sbin/service mongodb-mms-backup-agent start, /sbin/service mongodb-mms-backup-agent stop, /sbin/service mongodb-mms-backup-daemon start, /sbin/service mongodb-mms-backup-daemon stop, /usr/bin/pip install pymango*, /bin/rview /var/log/messages, /bin/rvi /etc/mongod-blockstore.conf, /usr/bin/yum list installed, /usr/bin/yum remove mongodb-enterprise*, /bin/rvi /etc/openldap/trusted-local-CA-chain.pem, /bin/rvi /etc/openldap/ldap.conf, /usr/bin/easy_install pip, /usr/bin/pip install *, /bin/rm /etc/yum.repos.d/mongodb-enterprise/[!'..']*, /usr/bin/yum install cyrus-sasl cyrus-sasl-plain cyrus-sasl-gssapi krb5-libs lm_sensors-libs net-snmp-agent-libs net-snmp openssl rpm-libs tcp_wrappers-libs, /sbin/service mongod-appdb restart, /sbin/service mongod-appdb start, /sbin/service mongod-appdb status, /sbin/service  mongod-appdb stop, /sbin/service mongod-blockstore restart, /sbin/service mongod-blockstore start, /sbin/service mongod-blockstore status, /sbin/service mongod-blockstore stop, /bin/rm /etc/yum.repos.d/mongodb-*.repo, /bin/cp /tmp/[!'..']* /opt/mongodb/mms/mongodb-releases, /bin/chown -R mongodb-mms\:mongodb-mms /opt/mongodb/mms/mongodb-releases, /opt/mongodb-mms-automation/bin/mongodb-mms-automation-make-init-scripts -boot, /bin/rvi /etc/security/limits.d/99-mongodb-mms-automation-agent.conf, /bin/yum check, /bin/rvi /etc/systemd/system/mongodb-mms-automation-agent.service,/bin/systemctl daemon-reload, /usr/bin/yum erase mongodb-*, !/usr/bin/yum erase mongodb-* *, /bin/rvi /etc/mongod-appdb.conf, /usr/bin/easy_install pymongo, /bin/rvi /etc/logrotate.d/mongod-blockstore, /sbin/logrotate --force /etc/logrotate.d/mongod-blockstore, /sbin/logrotate --force, /etc/logrotate.d/mongod, /bin/rm /opt/mongodb/mms/logs/daemon.20*.gz, /bin/rm /opt/mongodb/mms/logs/mms0.20*.gz, /bin/rm  /opt/mongodb/mms/logs/mms0-access.20*.gz, /bin/su - mongodb-mms, /bin/rpm -U mongodb-mms-*.rpm, /bin/rpm -e mongodb*, !/bin/rpm -e * *, /bin/cp /tmp/cacerts /opt/mongodb/mms/jdk/jre/lib/security/cacerts, /bin/rvi /opt/mongodb/mms/conf/mms.conf, /bin/rvi /etc/init.d/mongodb-mms-automation-agent, /sbin/blockdev --report *, !/sbin/blockdev --report * *, /bin/rvi /etc/mongodb-mms/server-pool.properties, /usr/bin/yum repolist all' >> /etc/sudoers
+          echo 'mongod         ALL=(root)      !/usr/local/bin/sudo, !/usr/bin/sudo, !/bin/sudo' >> /etc/sudoers
+          sudo groupadd mongod
+          useradd -g mongod mongod
+          sudo mkfs.xfs /dev/nvme4n1
+          sleep 10
+          echo /dev/nvme4n1  /var/mongolog xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkfs.xfs /dev/nvme1n1
+          sleep 10
+          echo /dev/nvme1n1  /mongodata xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkfs.xfs /dev/nvme3n1
+          sleep 10
+          echo /dev/nvme3n1  /backup xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkdir /var/mongolog
+          sudo mount /dev/nvme4n1 /var/mongolog
+          chown -R mongod:mongod /var/mongolog
+          chmod -R 755 /var/mongolog
+          sudo mkdir /mongodata
+          sudo mount /dev/nvme1n1 /mongodata
+          chown -R mongod:mongod /mongodata
+          chmod -R 755 /mongodata
+          sudo mkdir /backup
+          sudo mount /dev/nvme3n1 /backup
+          chown -R mongod:mongod /backup
+          chmod -R 755 /backup
+          ###############
+          ###############
+          sudo /usr/bin/yum -y install cyrus-sasl cyrus-sasl-plain cyrus-sasl-gssapi krb5-libs lm_sensors-libs net-snmp-agent-libs net-snmp openssl rpm-libs tcp_wrappers-libs
+
+          sudo /usr/bin/yum -y install deltarpm
+
+          # User Limits
+          # MongoDb limits
+          echo "mongod              soft    nofile          64000" > /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nofile          64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+
+          #Kernel Parameters
+
+          echo "net.ipv4.tcp_keepalive_time = 120" > /etc/sysctl.d/99-mongod.conf
+          echo "vm.zone_reclaim_mode = 0" >> /etc/sysctl.d/99-mongod.conf
+          sysctl -p /etc/sysctl.d/99-mongod.conf
+
+          if cat /etc/rc.local | grep -q 'transparent_hugepage'; then
+                          echo "Seems like we already have the THP stuff in rc.local"
+          else
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+          fi
+
+
+          bash /etc/rc.local
+          #blockdev setting
+
+          echo 'ACTION!="add|change", GOTO="ra_end"' > /etc/udev/rules.d/99-readahead.rules
+          echo 'KERNEL=="dm-*", SUBSYSTEM=="block", ENV{DM_VG_NAME}=="appvg", ENV{DM_LV_NAME}=="data_lv", RUN+="/sbin/blockdev --setra 0 /dev/mapper/appvg-data_lv"' >> /etc/udev/rules.d/99-readahead.rules
+          echo 'LABEL="ra_end"' >> /etc/udev/rules.d/99-readahead.rules
+          udevadm trigger
+
+          ################
+          #MongoD Installation
+          ################
+          cat > /etc/yum.repos.d/mongodb-enterprise.repo << EOF1
+          [mongodb-enterprise]
+          name=MongoDB Enterprise Repository
+          baseurl=https://repo.mongodb.com/yum/redhat/\$releasever/mongodb-enterprise/3.6/\$basearch/
+          check=1
+          enabled=1
+          gpgkey=https://www.mongodb.org/static/pgp/server-3.6.asc
+          EOF1
+          sudo yum install -y mongodb-enterprise
+          sleep 60
+          semanage port -a -t mongod_port_t -p tcp 27017 
+          sudo service mongod start
+          sudo service mongod restart
+          echo "exclude=mongodb-enterprise,mongodb-enterprise-server,mongodb-enterprise-shell,mongodb-enterprise-mongos,mongodb-enterprise-tools" >> /etc/yum.conf
+          sed -i -e 's/27017/37043/g' /etc/mongod.conf
+          ##############
+          # Download, Install, Configure, and Enable MongoDB Automation Agent
+          ##############
+          OPS_MGR_URI=http://va10plvpos300.wellpoint.com:27030
+          #AGENT_RPM=mongodb-mms-automation-agent-manager-4.5.13.5261-1.x86_64.rhel7.rpm
+          AGENT_RPM=mongodb-mms-automation-agent-manager-latest.x86_64.rhel7.rpm
+          cd /root && curl -OL $OPS_MGR_URI/download/agent/automation/$AGENT_RPM
+          rpm -U $AGENT_RPM
+          AUTOMATION_AGENT_CONFIG_FILE=/etc/mongodb-mms/automation-agent.config
+          sed -i "s/serverPoolKey=*./serverPoolKey=0f330d158d39a0ac0582d86bc30ec94d/g" $AUTOMATION_AGENT_CONFIG_FILE
+          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://va10plvpos300.wellpoint.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
+          #sed -i 's!logFile=*!logFile=/var/log/mongodb-mms-automation/automation-agent.log!g' $AUTOMATION_AGENT_CONFIG_FILE
+          systemctl enable mongodb-mms-automation-agent.service
+          ##############
+          # Configure server pool properties
+          ##############
+          # Get t-shirt size
+          #NUM_CPUS=$(grep processor /proc/cpuinfo | tail -n 1 | awk -F ":" '{print $2}')
+          METADATA_SERVER_IP=169.254.169.254
+          INSTANCE_TYPE_ENDPOINT='/latest/meta-data/instance-type/'
+          TSHIRTSIZE=$(curl http://169.254.169.254$INSTANCE_TYPE_ENDPOINT)
+          # Get the chipset size
+          CHIPSET=INTEL
+          # Get the location
+          REGION_ENDPOINT='/latest/meta-data/placement/availability-zone/'
+          LOCATION=$(curl http://$METADATA_SERVER_IP$REGION_ENDPOINT)
+          # Get the instance type
+          ENV=DEV
+          # Update server pool file
+          SERVER_POOL_PROPS_FILE=/etc/mongodb-mms/server-pool.properties
+          echo "CHIPSET=$CHIPSET" >> $SERVER_POOL_PROPS_FILE
+          echo "ENV=$ENV" >> $SERVER_POOL_PROPS_FILE
+          echo "LOCATION=$LOCATION" >> $SERVER_POOL_PROPS_FILE
+          echo "TSHIRTSIZE=$TSHIRTSIZE" >> $SERVER_POOL_PROPS_FILE
+          systemctl restart mongodb-mms-automation-agent.service
+          systemctl enable mongodb-mms-automation-agent.service
+ Mongolog3:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1b
+   VolumeType: !Ref VolumeType
+   Size: 50
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdblog3-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ Mongodata3:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1b
+   VolumeType: !Ref VolumeType
+   Size: 50
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdbdata3-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ Mongobackup3:
+  Type: AWS::EC2::Volume
+  Properties:
+   AvailabilityZone: us-east-1b
+   VolumeType: !Ref VolumeType
+   Size: 100
+   Iops: !Ref Iops
+   Encrypted: "true"
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdbbackup3-ebs"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key:  resourcetype
+      Value: !Ref resourcetype
+
+ MongoDNode3:
+  Type: AWS::EC2::Instance
+  Properties:
+   NetworkInterfaces:
+    - NetworkInterfaceId: !Ref NetworkInterface3
+      DeviceIndex: '0'
+   KeyName: !Ref SshKeyName
+   #SubnetId: !Ref PrivateSubnetAZ2
+   ImageId: !Ref InstanceAmiId
+   InstanceType: !Ref InstanceType
+   Volumes:
+    - Device: "/dev/sdg"
+      VolumeId: !Ref Mongolog3
+    - Device: "/dev/sdf"
+      VolumeId: !Ref Mongodata3
+    - Device: "/dev/sdh"
+      VolumeId: !Ref Mongobackup3    
+   Tags:
+    - Key: Name
+      Value: !Sub "${ApplicationName}-${EnvironmentName}-mdb3-ec2"
+    - Key: costcenter
+      Value: !Ref costcenter
+    - Key: resourcetype
+      Value: !Ref resourcetype
+   UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash -xe
+          ################
+          # Add groups, make/mount filesystems
+          ################
+          sudo su
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAmMQNHGQbhWYIalFWtFxemWoO0fwM/FGNl6LCD7rTuYxW+kGIOZgYmBcQWT90h9p+MW0p1NDF1IYyDaKObboAiEAYclZSuIHoXf5HOC0HSgP9bGsdjyd/Ic2yP5IYGi4gJ52HVRUmFab8B/fDEJpyEZGP0l0emiLm0/S/TJKKNhtNjLB8MBVTTyL6wfR+fPjRMobIje7fyR4W575lAFcCNfEQgBlwl8tUNl/oZnnDiH7piKMWtZdlp1DvK+MmQOM6QCr3z4hgWBw1eMvs8E0w4Td2X4ee6OC3oPAQzxEcwmXs/Yy2qKaqPchIv9unRMnNsrO2pDMgAqJvZ6IgIs9s0w== rsa-key-20180524 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA07INw9hSCo+W8lnZXWGRk+mwpIhbE3SK+ADN070xudvdNIgNrUJqCLTElY5yYV4XUUCGvuqEQFrEVrdhpA1cruaYwxtjkZnQ8oHm6MWNbMMuGs0YtP5oocHyqx+p7V7LB7UwA5TWZvMHBSAd23+LM4/ZLKB8fetIfLgknMcCdBwYI+OtiBuKEoVA7NIIyJ6g20X3HvE7+KTcC3GiwluP4+O3Uf1wxY0W8lf0NeZVxB3tbINBKUT/XxZppZn+TKVTKSRYaAcFI44tEubdY59bsgYZYdqOEN9+RpIBgqXi2dOUSmuzvNGaJ5ndw9xLOoJehNeViVHy8X/5f/CTdp43mQ== rsa-key-20180712 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAwq4erJ8VJj751tKBoGapB9e1LRfdLmQUbiyszB+tubvKXZ9Wfqm3RH+TOs42Er9RzruSZHLd+yr/H+ykYyuL922CScgIxXYJs8hdqMunWJePHFdE5N3Xxe56LGm4NW+ToreKaxUba20NDcSNG0Wtu1vLIuhTYir3TCToXs0kknZkkSGd57qrbU4SQpHaoPfZ2dZ6cCOZNNj3YP6isNd5D5pNpXGvHcnyI3L2IcJURufptwDtVb4WGmU6KzkwMGSeTKGiRQZPahY89aMTM+IvYlWSpXMv8YaG+HQvRdYUmxF5O7Fm+nUP0oKiTQlkyQ+XJ78IpfmMCl0Vq8kxOSxvcw== rsa-key-20180611 >> //home/ec2-user/.ssh/authorized_keys
+          echo ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAxcwEnG+w4P8GSTwkUBFQ8swx5VfZwQqkJ7UGdFmq6alr0ah0blqlxk00lSTsgShX4ljmLHgYMFuC7lMNjx87ESo4wkrDmE2uah5MOD/G075hJJZoDaQisEj4pH5k+vqZ9gxseTBgJ+V1G4KtSySfAJIIFWKgq8/4KEvBL0jkv9keUjr+uKv6Ez4zILbT3YGKqpZkw+U6qUFuEqmVrpgz6J/N4n5hLj4NQbE+PyHyFZFrjqx8UCLDQdjW+P2jLyLzUMqCfhBHDl4zIKaD9K3ZmZYKsPAQmA3WD4B/Sqcs+NIWc2pEfj9x0lRrchs9L7+/hV7GMiVDeleZLcuv9D8/sQ== rsa-key-20180928 >> //home/ec2-user/.ssh/authorized_keys
+          echo 'mongod          ALL=(root)      NOPASSWD: /bin/rpm -U mongodb-mms-automation-agent-*.rpm, /bin/rpm -ivh mongodb-mms-2.0.0.327-1.x86_64.rpm, /bin/rvi /etc/init.d/mongod,/bin/rvi /etc/logrotate.d/mongodb, /bin/rvi /etc/mongod.conf,/bin/rvi /etc/mongodb-mms/automation-agent.config,/bin/rvi /etc/yum.conf,/bin/rvi /etc/yum.repos.d/mongodb-*.repo,/bin/rvi /etc/yum.repos.d/mongodb-enterprise-*.repo,/bin/rvi /etc/yum.repos.d/mongodb-enterprise-3.2.repo,/bin/rvi /opt/mongodb/mms/conf/conf-mms.properties, /bin/sh mdiag.sh, /bin/su - mongod, /sbin/blockdev --report, /sbin/chkconfig mongod on,/sbin/service mongod restart, /sbin/service mongod start, /sbin/service mongod status, /sbin/service mongod stop, /sbin/service mongodb-mms restart, /sbin/service mongodb-mms start, /sbin/service mongodb-mms status, /sbin/service mongodb-mms stop, /sbin/service mongodb-mms-automation-agent check, /sbin/service mongodb-mms-automation-agent restart, /sbin/service mongodb-mms-automation-agent start, /sbin/service mongodb-mms-automation-agent status, /sbin/service mongodb-mms-automation-agent stop, /usr/bin/yum clean all, /usr/bin/yum  install -y mongo*, /usr/bin/yum install -y mongodb-enterprise, /usr/bin/yum install -y mongodb-enterprise-2.6.9  mongodb-enterprise-server-2.6.9, /usr/bin/yum install python33-python-pymongo mongodb-enterprise-shell-2.6.9 mongodb-enterprise-mongos-2.6.9 mongodb-enterprise-tools-2.6.9, /sbin/service mongodb-mms-monitoring-agent stop, /sbin/service mongodb-mms-monitoring-agent start, /sbin/service mongodb-mms-backup-agent start, /sbin/service mongodb-mms-backup-agent stop, /sbin/service mongodb-mms-backup-daemon start, /sbin/service mongodb-mms-backup-daemon stop, /usr/bin/pip install pymango*, /bin/rview /var/log/messages, /bin/rvi /etc/mongod-blockstore.conf, /usr/bin/yum list installed, /usr/bin/yum remove mongodb-enterprise*, /bin/rvi /etc/openldap/trusted-local-CA-chain.pem, /bin/rvi /etc/openldap/ldap.conf, /usr/bin/easy_install pip, /usr/bin/pip install *, /bin/rm /etc/yum.repos.d/mongodb-enterprise/[!'..']*, /usr/bin/yum install cyrus-sasl cyrus-sasl-plain cyrus-sasl-gssapi krb5-libs lm_sensors-libs net-snmp-agent-libs net-snmp openssl rpm-libs tcp_wrappers-libs, /sbin/service mongod-appdb restart, /sbin/service mongod-appdb start, /sbin/service mongod-appdb status, /sbin/service  mongod-appdb stop, /sbin/service mongod-blockstore restart, /sbin/service mongod-blockstore start, /sbin/service mongod-blockstore status, /sbin/service mongod-blockstore stop, /bin/rm /etc/yum.repos.d/mongodb-*.repo, /bin/cp /tmp/[!'..']* /opt/mongodb/mms/mongodb-releases, /bin/chown -R mongodb-mms\:mongodb-mms /opt/mongodb/mms/mongodb-releases, /opt/mongodb-mms-automation/bin/mongodb-mms-automation-make-init-scripts -boot, /bin/rvi /etc/security/limits.d/99-mongodb-mms-automation-agent.conf, /bin/yum check, /bin/rvi /etc/systemd/system/mongodb-mms-automation-agent.service,/bin/systemctl daemon-reload, /usr/bin/yum erase mongodb-*, !/usr/bin/yum erase mongodb-* *, /bin/rvi /etc/mongod-appdb.conf, /usr/bin/easy_install pymongo, /bin/rvi /etc/logrotate.d/mongod-blockstore, /sbin/logrotate --force /etc/logrotate.d/mongod-blockstore, /sbin/logrotate --force, /etc/logrotate.d/mongod, /bin/rm /opt/mongodb/mms/logs/daemon.20*.gz, /bin/rm /opt/mongodb/mms/logs/mms0.20*.gz, /bin/rm  /opt/mongodb/mms/logs/mms0-access.20*.gz, /bin/su - mongodb-mms, /bin/rpm -U mongodb-mms-*.rpm, /bin/rpm -e mongodb*, !/bin/rpm -e * *, /bin/cp /tmp/cacerts /opt/mongodb/mms/jdk/jre/lib/security/cacerts, /bin/rvi /opt/mongodb/mms/conf/mms.conf, /bin/rvi /etc/init.d/mongodb-mms-automation-agent, /sbin/blockdev --report *, !/sbin/blockdev --report * *, /bin/rvi /etc/mongodb-mms/server-pool.properties, /usr/bin/yum repolist all' >> /etc/sudoers
+          echo 'mongod         ALL=(root)      !/usr/local/bin/sudo, !/usr/bin/sudo, !/bin/sudo' >> /etc/sudoers
+          sudo groupadd mongod
+          useradd -g mongod mongod
+          sudo mkfs.xfs /dev/nvme4n1
+          sleep 10
+          echo /dev/nvme4n1  /var/mongolog xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkfs.xfs /dev/nvme1n1
+          sleep 10
+          echo /dev/nvme1n1  /mongodata xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkfs.xfs /dev/nvme3n1
+          sleep 10
+          echo /dev/nvme3n1  /backup xfs defaults,nofail 0 0 >> /etc/fstab
+          sudo mkdir /var/mongolog
+          sudo mount /dev/nvme4n1 /var/mongolog
+          chown -R mongod:mongod /var/mongolog
+          chmod -R 755 /var/mongolog
+          sudo mkdir /mongodata
+          sudo mount /dev/nvme1n1 /mongodata
+          chown -R mongod:mongod /mongodata
+          chmod -R 755 /mongodata
+          sudo mkdir /backup
+          sudo mount /dev/nvme3n1 /backup
+          chown -R mongod:mongod /backup
+          chmod -R 755 /backup
+          ###############
+          ###############
+          sudo /usr/bin/yum -y install cyrus-sasl cyrus-sasl-plain cyrus-sasl-gssapi krb5-libs lm_sensors-libs net-snmp-agent-libs net-snmp openssl rpm-libs tcp_wrappers-libs
+
+          sudo /usr/bin/yum -y install deltarpm
+
+          # User Limits
+          # MongoDb limits
+          echo "mongod              soft    nofile          64000" > /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nofile          64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    nproc           64000" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    memlock         2097152" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              hard    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+          echo "mongod              soft    sigpending         253261" >> /etc/security/limits.d/99-mongodb-nproc.conf
+
+          #Kernel Parameters
+
+          echo "net.ipv4.tcp_keepalive_time = 120" > /etc/sysctl.d/99-mongod.conf
+          echo "vm.zone_reclaim_mode = 0" >> /etc/sysctl.d/99-mongod.conf
+          sysctl -p /etc/sysctl.d/99-mongod.conf
+
+          if cat /etc/rc.local | grep -q 'transparent_hugepage'; then
+                          echo "Seems like we already have the THP stuff in rc.local"
+          else
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/enabled; then " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/enabled  " >> /etc/rc.local
+                          echo "fi  " >> /etc/rc.local
+                          echo "if test -f /sys/kernel/mm/redhat_transparent_hugepage/defrag; then  " >> /etc/rc.local
+                          echo "   echo never > /sys/kernel/mm/redhat_transparent_hugepage/defrag  " >> /etc/rc.local
+                          echo "fi"   >> /etc/rc.local
+          fi
+
+
+          bash /etc/rc.local
+          #blockdev setting
+
+          echo 'ACTION!="add|change", GOTO="ra_end"' > /etc/udev/rules.d/99-readahead.rules
+          echo 'KERNEL=="dm-*", SUBSYSTEM=="block", ENV{DM_VG_NAME}=="appvg", ENV{DM_LV_NAME}=="data_lv", RUN+="/sbin/blockdev --setra 0 /dev/mapper/appvg-data_lv"' >> /etc/udev/rules.d/99-readahead.rules
+          echo 'LABEL="ra_end"' >> /etc/udev/rules.d/99-readahead.rules
+          udevadm trigger
+
+          ################
+          #MongoD Installation
+          ################
+          cat > /etc/yum.repos.d/mongodb-enterprise.repo << EOF1
+          [mongodb-enterprise]
+          name=MongoDB Enterprise Repository
+          baseurl=https://repo.mongodb.com/yum/redhat/\$releasever/mongodb-enterprise/3.6/\$basearch/
+          check=1
+          enabled=1
+          gpgkey=https://www.mongodb.org/static/pgp/server-3.6.asc
+          EOF1
+          sudo yum install -y mongodb-enterprise
+          sleep 60
+          semanage port -a -t mongod_port_t -p tcp 27017 
+          sudo service mongod start
+          sudo service mongod restart
+          echo "exclude=mongodb-enterprise,mongodb-enterprise-server,mongodb-enterprise-shell,mongodb-enterprise-mongos,mongodb-enterprise-tools" >> /etc/yum.conf
+          sed -i -e 's/27017/37043/g' /etc/mongod.conf
+          ##############
+          # Download, Install, Configure, and Enable MongoDB Automation Agent
+          ##############
+          OPS_MGR_URI=http://va10plvpos300.wellpoint.com:27030
+          #AGENT_RPM=mongodb-mms-automation-agent-manager-4.5.13.5261-1.x86_64.rhel7.rpm
+          AGENT_RPM=mongodb-mms-automation-agent-manager-latest.x86_64.rhel7.rpm
+          cd /root && curl -OL $OPS_MGR_URI/download/agent/automation/$AGENT_RPM
+          rpm -U $AGENT_RPM
+          AUTOMATION_AGENT_CONFIG_FILE=/etc/mongodb-mms/automation-agent.config
+          sed -i "s/serverPoolKey=*./serverPoolKey=0f330d158d39a0ac0582d86bc30ec94d/g" $AUTOMATION_AGENT_CONFIG_FILE
+          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://va10plvpos300.wellpoint.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
+          #sed -i 's!logFile=*!logFile=/var/log/mongodb-mms-automation/automation-agent.log!g' $AUTOMATION_AGENT_CONFIG_FILE
+          systemctl enable mongodb-mms-automation-agent.service
+          ##############
+          # Configure server pool properties
+          ##############
+          # Get t-shirt size
+          #NUM_CPUS=$(grep processor /proc/cpuinfo | tail -n 1 | awk -F ":" '{print $2}')
+          METADATA_SERVER_IP=169.254.169.254
+          INSTANCE_TYPE_ENDPOINT='/latest/meta-data/instance-type/'
+          TSHIRTSIZE=$(curl http://169.254.169.254$INSTANCE_TYPE_ENDPOINT)
+          # Get the chipset size
+          CHIPSET=INTEL
+          # Get the location
+          REGION_ENDPOINT='/latest/meta-data/placement/availability-zone/'
+          LOCATION=$(curl http://$METADATA_SERVER_IP$REGION_ENDPOINT)
+          # Get the instance type
+          ENV=DEV
+          # Update server pool file
+          SERVER_POOL_PROPS_FILE=/etc/mongodb-mms/server-pool.properties
+          echo "CHIPSET=$CHIPSET" >> $SERVER_POOL_PROPS_FILE
+          echo "ENV=$ENV" >> $SERVER_POOL_PROPS_FILE
+          echo "LOCATION=$LOCATION" >> $SERVER_POOL_PROPS_FILE
+          echo "TSHIRTSIZE=$TSHIRTSIZE" >> $SERVER_POOL_PROPS_FILE
+          systemctl restart mongodb-mms-automation-agent.service
+          systemctl enable mongodb-mms-automation-agent.service
+
+ mdbnode1InstanceRecoveryAlarm:
+  Type: AWS::CloudWatch::Alarm
+  Properties:
+   AlarmDescription: EC2 Autorecovery for Node Instance. Autorecover if we fail
+   Namespace: AWS/EC2
+   MetricName: StatusCheckFailed_System
+   Statistic: Minimum
+   Period: '60'
+   EvaluationPeriods: '5'
+   ComparisonOperator: GreaterThanThreshold
+   Threshold: '0'
+   AlarmActions:
+   - Fn::Join:
+     - ''
+     - - 'arn:aws:automate:'
+       - Ref: AWS::Region
+       - ":ec2:recover"
+   Dimensions:
+   - Name: InstanceId
+     Value: !Ref MongoDNode1
+
+ mdbnode2InstanceRecoveryAlarm:
+  Type: AWS::CloudWatch::Alarm
+  Properties:
+   AlarmDescription: EC2 Autorecovery for Node Instance. Autorecover if we fail
+   Namespace: AWS/EC2
+   MetricName: StatusCheckFailed_System
+   Statistic: Minimum
+   Period: '60'
+   EvaluationPeriods: '5'
+   ComparisonOperator: GreaterThanThreshold
+   Threshold: '0'
+   AlarmActions:
+   - Fn::Join:
+     - ''
+     - - 'arn:aws:automate:'
+       - Ref: AWS::Region
+       - ":ec2:recover"
+   Dimensions:
+   - Name: InstanceId
+     Value: !Ref MongoDNode2
+
+ mdbnode3InstanceRecoveryAlarm:
+  Type: AWS::CloudWatch::Alarm
+  Properties:
+   AlarmDescription: EC2 Autorecovery for Node Instance. Autorecover if we fail
+   Namespace: AWS/EC2
+   MetricName: StatusCheckFailed_System
+   Statistic: Minimum
+   Period: '60'
+   EvaluationPeriods: '5'
+   ComparisonOperator: GreaterThanThreshold
+   Threshold: '0'
+   AlarmActions:
+   - Fn::Join:
+     - ''
+     - - 'arn:aws:automate:'
+       - Ref: AWS::Region
+       - ":ec2:recover"
+   Dimensions:
+   - Name: InstanceId
+     Value: !Ref MongoDNode3
