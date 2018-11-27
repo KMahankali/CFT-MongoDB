@@ -24,20 +24,16 @@ Parameters:
   InstanceAmiId:
     Description: Specifies the AMI ID for your container instances
     Type: String
-    #Default: ami-0221d14f37b6a6c30
-    #Default: ami-003ff4bc201a81e3d
-    Default: ami-0f8e5223638afe974
+    Default: ami-xyz
 
   SshKeyName:
    Description: KeyPair name for accessing EC2 instances in cluster
    Type: AWS::EC2::KeyPair::KeyName
-   #Default: 'mongodb'
    Default: 'MongoPOC'
 
   InstanceType:
    Description: EC2 Instance Type
    Type: String
-   #Default: m5.xlarge
    AllowedValues:
      - m5.xlarge
      - t2.medium
@@ -62,19 +58,16 @@ Parameters:
    Description: 'Which subnets the EC2 instances should be deployed to.'
    #Type: List<AWS::EC2::Subnet::Id>
    Type: String
-   #Default: "subnet-000647f47e1a6be01,subnet-07b314eee51b367d7"
-   Default: subnet-0fdf583c85b4c502e
+   Default: subnet-xyz
 
   PrivateSubnetAZ2:
    Description: 'Which subnets the EC2 instances should be deployed to.'
    Type: String
-   #Type: List<AWS::EC2::Subnet::Id>
-   #Default: "subnet-000647f47e1a6be01,subnet-07b314eee51b367d7"
-   Default: subnet-08bac8e0d3ea3d9c8
+   Default: subnet-xyz
 
   costcenter:
    Type: String
-   Default: '6590190300'
+   Default: 'xyz'
 
   resourcetype:
    Type: String
@@ -103,32 +96,32 @@ Resources:
       IpProtocol: tcp
       FromPort: 37040
       ToPort: 37050
-      CidrIp: 22.174.106.0/24
-      Description: Traffic to MonMongoDB on Anthem MongoDB port
+      CidrIp: 0.0.0.0/24
+      Description: xyz
     -
       IpProtocol: tcp
       FromPort: 37040
       ToPort: 37050
-      CidrIp: 30.0.0.0/16
-      Description: Traffic ANthem Network
+      CidrIp: 0.0.0.0/16
+      Description: xyz
     -          
       IpProtocol: tcp
       FromPort: 22
       ToPort: 22
-      CidrIp: 22.174.106.128/25
-      Description: Basic SSH on SandBox Subnet
+      CidrIp: 0.0.0.0/25
+      Description: xyz
     -
       IpProtocol: tcp
       FromPort: 22
       ToPort: 22
-      CidrIp: 30.120.0.0/16
-      Description: Inbound Anthem Richmond Premise
+      CidrIp: 0.0.0.0/16
+      Description: xyz
     -
       IpProtocol: tcp
       FromPort: 22
       ToPort: 22
-      CidrIp: 30.138.0.0/16
-      Description: Inbound Anthem Network
+      CidrIp: 0.0.0.0/16
+      Description: xyz
 
     -
       IpProtocol: tcp
@@ -141,14 +134,14 @@ Resources:
       IpProtocol: tcp
       FromPort: 27020
       ToPort: 27030
-      CidrIp: 22.174.106.0/24
-      Description: Access Rule for Mongo Hosts in 2/25 Subnets
+      CidrIp: 0.0.0.0/24
+      Description: xyz
     -
       IpProtocol: tcp
       FromPort: 27020
       ToPort: 27030
-      CidrIp: 30.128.117.0/24
-      Description: Ops Manager Onprem
+      CidrIp: 0.0.0.0/24
+      Description: xyz
 
    Tags:
     - Key: Name
@@ -161,7 +154,7 @@ Resources:
  NetworkInterface1: 
   Type: AWS::EC2::NetworkInterface
   Properties: 
-   SubnetId: subnet-0fdf583c85b4c502e
+   SubnetId: subnet-xyz
    GroupSet: [{ "Ref" : "MongoDBSecurityGroup" }]
    SourceDestCheck: 'true'
    Tags:
@@ -175,7 +168,7 @@ Resources:
  NetworkInterface2: 
   Type: AWS::EC2::NetworkInterface
   Properties: 
-   SubnetId: subnet-0fdf583c85b4c502e
+   SubnetId: subnet-xyz
    GroupSet: [{ "Ref" : "MongoDBSecurityGroup" }]
    SourceDestCheck: 'true'
    Tags:
@@ -189,7 +182,7 @@ Resources:
  NetworkInterface3: 
   Type: AWS::EC2::NetworkInterface
   Properties: 
-   SubnetId: subnet-08bac8e0d3ea3d9c8
+   SubnetId: subnet-xyz
    GroupSet: [{ "Ref" : "MongoDBSecurityGroup" }]
    SourceDestCheck: 'true'
    Tags:
@@ -379,7 +372,7 @@ Resources:
           ##############
           # Download, Install, Configure, and Enable MongoDB Automation Agent
           ##############
-          OPS_MGR_URI=http://va10plvpos300.wellpoint.com:27030
+          OPS_MGR_URI=http://xyz.abc.com:27030
           #AGENT_RPM=mongodb-mms-automation-agent-manager-4.5.13.5261-1.x86_64.rhel7.rpm
           AGENT_RPM=mongodb-mms-automation-agent-manager-latest.x86_64.rhel7.rpm
           cd /root && curl -OL $OPS_MGR_URI/download/agent/automation/$AGENT_RPM
@@ -592,7 +585,7 @@ Resources:
           ##############
           # Download, Install, Configure, and Enable MongoDB Automation Agent
           ##############
-          OPS_MGR_URI=http://va10plvpos300.wellpoint.com:27030
+          OPS_MGR_URI=http://abc.com:27030
           #AGENT_RPM=mongodb-mms-automation-agent-manager-4.5.13.5261-1.x86_64.rhel7.rpm
           AGENT_RPM=mongodb-mms-automation-agent-manager-latest.x86_64.rhel7.rpm
           cd /root && curl -OL $OPS_MGR_URI/download/agent/automation/$AGENT_RPM
@@ -804,7 +797,7 @@ Resources:
           ##############
           # Download, Install, Configure, and Enable MongoDB Automation Agent
           ##############
-          OPS_MGR_URI=http://va10plvpos300.wellpoint.com:27030
+          OPS_MGR_URI=http://abc.com:27030
           #AGENT_RPM=mongodb-mms-automation-agent-manager-4.5.13.5261-1.x86_64.rhel7.rpm
           AGENT_RPM=mongodb-mms-automation-agent-manager-latest.x86_64.rhel7.rpm
           cd /root && curl -OL $OPS_MGR_URI/download/agent/automation/$AGENT_RPM
