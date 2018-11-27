@@ -379,7 +379,7 @@ Resources:
           rpm -U $AGENT_RPM
           AUTOMATION_AGENT_CONFIG_FILE=/etc/mongodb-mms/automation-agent.config
           sed -i "s/serverPoolKey=*./serverPoolKey=0f330d158d39a0ac0582d86bc30ec94d/g" $AUTOMATION_AGENT_CONFIG_FILE
-          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://va10plvpos300.wellpoint.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
+          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://abc.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
           #sed -i 's!logFile=*!logFile=/var/log/mongodb-mms-automation/automation-agent.log!g' $AUTOMATION_AGENT_CONFIG_FILE
           systemctl enable mongodb-mms-automation-agent.service
           ##############
@@ -592,7 +592,7 @@ Resources:
           rpm -U $AGENT_RPM
           AUTOMATION_AGENT_CONFIG_FILE=/etc/mongodb-mms/automation-agent.config
           sed -i "s/serverPoolKey=*./serverPoolKey=0f330d158d39a0ac0582d86bc30ec94d/g" $AUTOMATION_AGENT_CONFIG_FILE
-          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://va10plvpos300.wellpoint.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
+          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://abc.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
           #sed -i 's!logFile=*!logFile=/var/log/mongodb-mms-automation/automation-agent.log!g' $AUTOMATION_AGENT_CONFIG_FILE
           systemctl enable mongodb-mms-automation-agent.service
           ##############
@@ -804,7 +804,7 @@ Resources:
           rpm -U $AGENT_RPM
           AUTOMATION_AGENT_CONFIG_FILE=/etc/mongodb-mms/automation-agent.config
           sed -i "s/serverPoolKey=*./serverPoolKey=0f330d158d39a0ac0582d86bc30ec94d/g" $AUTOMATION_AGENT_CONFIG_FILE
-          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://va10plvpos300.wellpoint.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
+          sed -i 's!mmsBaseUrl=*!mmsBaseUrl=http://abc.com:27030!g' $AUTOMATION_AGENT_CONFIG_FILE
           #sed -i 's!logFile=*!logFile=/var/log/mongodb-mms-automation/automation-agent.log!g' $AUTOMATION_AGENT_CONFIG_FILE
           systemctl enable mongodb-mms-automation-agent.service
           ##############
