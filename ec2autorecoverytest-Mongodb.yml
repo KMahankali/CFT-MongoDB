@@ -34,6 +34,7 @@ Parameters:
    Description: EC2 Instance Type
    Type: String
    AllowedValues:
+    - m5.xlarge
     - t2.large
     - i2.2xlarge
     - i2.4xlarge
