@@ -29,7 +29,7 @@ Parameters:
   SshKeyName:
    Description: KeyPair name for accessing EC2 instances in cluster
    Type: AWS::EC2::KeyPair::KeyName
-   Default: 'MongoPOC'
+   Default: 'KeyName'
 
   InstanceType:
    Description: EC2 Instance Type
@@ -247,7 +247,7 @@ Resources:
    NetworkInterfaces:
     - NetworkInterfaceId: !Ref NetworkInterface1
       DeviceIndex: '0'
-   KeyName: !Ref SshKeyName
+   KeyName: !Ref KeyName
    #SubnetId: !Ref PrivateSubnetAZ1
    ImageId: !Ref InstanceAmiId
    InstanceType: !Ref InstanceType
@@ -460,7 +460,7 @@ Resources:
    NetworkInterfaces:
     - NetworkInterfaceId: !Ref NetworkInterface2
       DeviceIndex: '0'
-   KeyName: !Ref SshKeyName
+   KeyName: !Ref KeyName
    #SubnetId: !Ref PrivateSubnetAZ1
    ImageId: !Ref InstanceAmiId
    InstanceType: !Ref InstanceType
@@ -672,7 +672,7 @@ Resources:
    NetworkInterfaces:
     - NetworkInterfaceId: !Ref NetworkInterface3
       DeviceIndex: '0'
-   KeyName: !Ref SshKeyName
+   KeyName: !Ref KeyName
    #SubnetId: !Ref PrivateSubnetAZ2
    ImageId: !Ref InstanceAmiId
    InstanceType: !Ref InstanceType
